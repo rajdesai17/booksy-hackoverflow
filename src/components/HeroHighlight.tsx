@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface HighlightProps {
+interface GradientTextProps {
   children: string;
   className?: string;
 }
 
-const Highlight = ({ children, className }: HighlightProps) => {
+const GradientText = ({ children, className }: GradientTextProps) => {
   return (
     <span
       className={cn(
@@ -43,7 +43,7 @@ const HeroHighlight = ({ text, highlightWords = [] }: HeroHighlightProps) => {
           className="inline-block"
         >
           {highlightWords.includes(word) ? (
-            <Highlight>{word}</Highlight>
+            <GradientText>{word}</GradientText>
           ) : (
             word
           )}{" "}
