@@ -1,17 +1,39 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
-const Navbar = () => {
+const Navbar = ({ session }: { session: any }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/");
+      toast({
+        title: "Logged out successfully",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
   const navLinks = [
     { name: "Home", path: "/" },
-    { name: "Register", path: "/register" },
     { name: "Discover", path: "/discover" },
-    { name: "Dashboard", path: "/dashboard" },
+    ...(session
+      ? [{ name: "Dashboard", path: "/dashboard" }]
+      : [{ name: "Register", path: "/register" }]),
   ];
 
   return (
@@ -35,6 +57,22 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            {session ? (
+              <button
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-primary transition-colors flex items-center"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </button>
+            ) : (
+              <Link
+                to="/auth"
+                className="text-primary hover:text-primary-dark transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -62,6 +100,26 @@ const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
+              {session ? (
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    toggleMenu();
+                  }}
+                  className="w-full text-left px-3 py-2 text-gray-600 hover:text-primary transition-colors flex items-center"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </button>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="block px-3 py-2 text-primary hover:text-primary-dark transition-colors"
+                  onClick={toggleMenu}
+                >
+                  Sign In
+                </Link>
+              )}
             </div>
           </div>
         )}
