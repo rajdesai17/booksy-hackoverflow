@@ -9,10 +9,7 @@ export interface Booking {
   booking_date: string;
   created_at: string;
   updated_at: string;
-  service?: {
-    id: string;
-    title: string;
-  };
+  service?: Service;
   customer?: {
     id: string;
     full_name: string;
