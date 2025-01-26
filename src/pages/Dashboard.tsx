@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface Service {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   price: number;
   category: string;
   city: string;
@@ -58,7 +58,7 @@ const Dashboard = () => {
     city: "Mumbai",
   });
 
-  const { data: user } = useQuery({
+  const { data: user, isLoading: isUserLoading } = useQuery({
     queryKey: ["user"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -66,7 +66,7 @@ const Dashboard = () => {
     },
   });
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
@@ -81,7 +81,7 @@ const Dashboard = () => {
     },
   });
 
-  const { data: services } = useQuery({
+  const { data: services, isLoading: isServicesLoading } = useQuery({
     queryKey: ["services", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
@@ -98,7 +98,7 @@ const Dashboard = () => {
     },
   });
 
-  const { data: bookings } = useQuery({
+  const { data: bookings, isLoading: isBookingsLoading } = useQuery({
     queryKey: ["bookings", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
@@ -179,7 +179,15 @@ const Dashboard = () => {
     });
   };
 
-  if (!profile) return <div>Loading...</div>;
+  if (isUserLoading || isProfileLoading) {
+    return <div className="min-h-screen pt-24 pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        Loading...
+      </div>
+    </div>;
+  }
+
+  if (!profile) return null;
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -264,56 +272,66 @@ const Dashboard = () => {
             </Card>
           )}
 
-          <div className="grid gap-6">
-            {services?.map((service) => (
-              <Card key={service.id} className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-                    <p className="text-gray-600">{service.description}</p>
-                    <p className="text-lg font-semibold mt-2">₹{service.price}</p>
-                    <p className="text-sm text-gray-500 mt-1">Category: {service.category}</p>
-                    <p className="text-sm text-gray-500">City: {service.city}</p>
+          {isServicesLoading ? (
+            <div>Loading services...</div>
+          ) : (
+            <div className="grid gap-6">
+              {services?.map((service) => (
+                <Card key={service.id} className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
+                      <p className="text-gray-600">{service.description}</p>
+                      <p className="text-lg font-semibold mt-2">₹{service.price}</p>
+                      <p className="text-sm text-gray-500 mt-1">Category: {service.category}</p>
+                      <p className="text-sm text-gray-500">City: {service.city}</p>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bookings Section */}
         <div>
           <h2 className="text-2xl font-semibold mb-6">Bookings</h2>
-          <div className="grid gap-6">
-            {bookings?.map((booking) => (
-              <Card key={booking.id} className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-2">{booking.service.title}</h3>
-                    <p className="text-gray-600">Booked by: {booking.customer.full_name}</p>
-                    <p className="text-gray-600">Date: {new Date(booking.booking_date).toLocaleDateString()}</p>
-                    <p className="text-gray-600">Status: {booking.status}</p>
-                  </div>
-                  <div className="space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "confirmed" })}
-                      disabled={booking.status === "confirmed"}
-                    >
-                      Confirm
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "rejected" })}
-                      disabled={booking.status === "rejected"}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+          {isBookingsLoading ? (
+            <div>Loading bookings...</div>
+          ) : (
+            <div className="grid gap-6">
+              {bookings?.map((booking) => (
+                booking.service && (
+                  <Card key={booking.id} className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">{booking.service.title}</h3>
+                        <p className="text-gray-600">Booked by: {booking.customer.full_name}</p>
+                        <p className="text-gray-600">Date: {new Date(booking.booking_date).toLocaleDateString()}</p>
+                        <p className="text-gray-600">Status: {booking.status}</p>
+                      </div>
+                      <div className="space-x-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "confirmed" })}
+                          disabled={booking.status === "confirmed"}
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "rejected" })}
+                          disabled={booking.status === "rejected"}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
