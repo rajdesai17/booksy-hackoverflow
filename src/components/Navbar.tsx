@@ -42,7 +42,7 @@ const Navbar = ({ session }: { session: any }) => {
         <div className="flex justify-between h-16">
           <div className="flex-shrink-0 flex items-center">
             <Link to="/" className="text-primary font-bold text-xl">
-              LocalServices
+              Booksy
             </Link>
           </div>
 

@@ -13,7 +13,7 @@ const Home = () => {
       <section className="pt-32 pb-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <HeroHighlight
-            text="Find Local Services You Can Trust"
+            text="Find Local Services You Can Trust"  // Keep this as is for service context
             highlightWords={["Trust"]}
           />
           <motion.p
@@ -22,7 +22,7 @@ const Home = () => {
             transition={{ delay: 0.5 }}
             className="mt-6 text-xl text-gray-600"
           >
-            Connect with verified local service providers in your area
+            Connect with verified local service providers on Booksy
           </motion.p>
           <motion.div
             initial={{ opacity: 0 }}
@@ -42,7 +42,7 @@ const Home = () => {
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">
-            Why Choose <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">LocalServices</span>
+            Why Choose <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">Booksy</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
