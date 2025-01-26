@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { Search, Star, MapPin } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { Service } from "@/types/service";
+import type { Feedback } from "@/types/feedback";
 
 const categories = [
   { id: 1, name: "Haircuts", icon: "💇‍♂️" },
@@ -21,24 +23,12 @@ const categories = [
 
 const cities = ["Mumbai", "Pune", "Bangalore"];
 
-interface Service {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  city: string;
-  category: string;
-  provider: {
-    full_name: string;
-  };
-}
-
 const Discover = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -55,7 +45,11 @@ const Discover = () => {
         .from('services')
         .select(`
           *,
-          provider:profiles(full_name)
+          provider:profiles(
+            id,
+            full_name,
+            city
+          )
         `)
         .gte('price', priceRange[0])
         .lte('price', priceRange[1]);
@@ -74,6 +68,30 @@ const Discover = () => {
       }
 
       return data as Service[];
+    },
+  });
+
+  const { data: providerFeedbacks, isLoading: isFeedbacksLoading } = useQuery({
+    queryKey: ['provider-feedbacks', selectedProvider],
+    enabled: !!selectedProvider,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select(`
+          *,
+          booking:bookings(
+            service:services(
+              id,
+              title,
+              provider_id
+            )
+          ),
+          customer:profiles(full_name)
+        `)
+        .eq('booking.service.provider_id', selectedProvider);
+
+      if (error) throw error;
+      return data as Feedback[];
     },
   });
 
@@ -101,10 +119,6 @@ const Discover = () => {
     },
   });
 
-  const handleCategoryClick = (categoryName: string) => {
-    setSelectedCategory(categoryName);
-  };
-
   const handleBookService = (serviceId: string) => {
     if (!user) {
       toast({
@@ -116,6 +130,10 @@ const Discover = () => {
     }
 
     createBooking.mutate({ serviceId });
+  };
+
+  const handleCategoryClick = (categoryName: string) => {
+    setSelectedCategory(categoryName);
   };
 
   return (
@@ -218,13 +236,20 @@ const Discover = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Provided by</p>
-                            <p className="font-medium mb-4">{service.provider?.full_name}</p>
-                            <Button 
-                              onClick={() => handleBookService(service.id)}
-                              variant="default"
+                            <button
+                              onClick={() => setSelectedProvider(service.provider?.id || null)}
+                              className="font-medium mb-4 hover:underline"
                             >
-                              Book Now
-                            </Button>
+                              {service.provider?.full_name}
+                            </button>
+                            <div>
+                              <Button 
+                                onClick={() => handleBookService(service.id)}
+                                variant="default"
+                              >
+                                Book Now
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </Card>
@@ -240,6 +265,55 @@ const Discover = () => {
           </div>
         </div>
       </div>
+
+      {/* Provider Profile Dialog */}
+      <Dialog open={!!selectedProvider} onOpenChange={() => setSelectedProvider(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Provider Profile</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {services?.find(s => s.provider?.id === selectedProvider)?.provider && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">
+                  {services.find(s => s.provider?.id === selectedProvider)?.provider?.full_name}
+                </h3>
+                <p className="text-gray-600">
+                  Location: {services.find(s => s.provider?.id === selectedProvider)?.provider?.city}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <h4 className="font-medium">Feedback & Reviews</h4>
+              {isFeedbacksLoading ? (
+                <p>Loading feedback...</p>
+              ) : providerFeedbacks && providerFeedbacks.length > 0 ? (
+                providerFeedbacks.map((feedback) => (
+                  <div key={feedback.id} className="border-b pb-4">
+                    <div className="flex space-x-1 mb-2">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < feedback.rating ? "text-yellow-400" : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-gray-600 text-sm">{feedback.comment}</p>
+                    <p className="text-gray-500 text-xs mt-2">
+                      By: {feedback.customer.full_name}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500">No feedback yet</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
