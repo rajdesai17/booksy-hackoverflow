@@ -86,7 +86,7 @@ const Discover = () => {
                       <SelectValue placeholder="Select city" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Cities</SelectItem>
+                      {/* Removed the empty value SelectItem */}
                       {cities.map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
