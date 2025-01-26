@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,50 +8,66 @@ import type { Booking } from "@/types/booking";
 
 export const ProviderBookings = () => {
   const { toast } = useToast();
-  const { data: bookings, isLoading, refetch } = useQuery({
+  const queryClient = useQueryClient();
+
+  // Add this query hook
+  const { data: bookings, isLoading } = useQuery({
     queryKey: ["provider-bookings"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
           *,
-          service:services(
-            id,
-            title
-          ),
-          customer:profiles(
-            id,
-            full_name
-          ),
-          feedback:feedbacks(*)
+          service:services(*),
+          customer:profiles(*)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Booking[];
-    },
+      return data;
+    }
   });
 
-  const handleUpdateStatus = async (bookingId: string, status: 'confirmed' | 'rejected') => {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status })
-      .eq('id', bookingId);
+  const updateBookingStatus = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: 'accepted' | 'rejected' }) => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId)
+        .select();
 
-    if (error) {
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      toast({
+        title: "Success",
+        description: "Booking status updated successfully"
+      });
+    },
+    onError: (error: any) => {
+      console.error('Booking update error:', error);
       toast({
         title: "Error",
-        description: "Could not update booking status",
-        variant: "destructive",
+        description: "Failed to update booking status",
+        variant: "destructive"
       });
-      return;
     }
+  });
 
-    refetch();
-    toast({
-      title: "Success",
-      description: `Booking ${status}`,
-    });
+  const handleStatusUpdate = async (bookingId: string, status: 'accepted' | 'rejected') => {
+    try {
+      await updateBookingStatus.mutateAsync({ bookingId, status });
+    } catch (error) {
+      console.error('Status update error:', error);
+    }
   };
 
   if (isLoading) return <div>Loading bookings...</div>;
@@ -71,17 +87,16 @@ export const ProviderBookings = () => {
             {booking.status === 'pending' && (
               <div className="space-x-2">
                 <Button
-                  onClick={() => handleUpdateStatus(booking.id, 'confirmed')}
-                  variant="outline"
-                  className="bg-green-50 hover:bg-green-100"
+                  onClick={() => handleStatusUpdate(booking.id, 'accepted')}
+                  disabled={updateBookingStatus.isLoading}
                 >
                   <Check className="w-4 h-4 mr-2" />
                   Accept
                 </Button>
                 <Button
-                  onClick={() => handleUpdateStatus(booking.id, 'rejected')}
-                  variant="outline"
-                  className="bg-red-50 hover:bg-red-100"
+                  onClick={() => handleStatusUpdate(booking.id, 'rejected')}
+                  disabled={updateBookingStatus.isLoading}
+                  variant="destructive"
                 >
                   <X className="w-4 h-4 mr-2" />
                   Reject

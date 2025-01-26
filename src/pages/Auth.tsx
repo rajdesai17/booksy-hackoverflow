@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
@@ -9,14 +9,19 @@ import { Label } from "@/components/ui/label";
 import { UserCircle, Briefcase } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Update Auth component to handle incoming state
 const Auth = () => {
+  const location = useLocation();
   const navigate = useNavigate();
+  
+  // Get initial values from navigation state
+  const initialState = location.state || {};
+  const [isLogin, setIsLogin] = useState(initialState.isLogin ?? true);
+  const [userType, setUserType] = useState(initialState.userType || null);
   const { toast } = useToast();
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [userType, setUserType] = useState<"customer" | "provider" | null>(null);
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {

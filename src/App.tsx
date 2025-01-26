@@ -12,6 +12,7 @@ import Auth from "@/pages/Auth";
 import Register from "@/pages/Register";
 import Discover from "@/pages/Discover";
 import Dashboard from "@/pages/Dashboard";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -48,19 +49,23 @@ const App = () => {
             <Navbar session={session} />
             <main className="flex-grow">
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<ErrorBoundary><Home /></ErrorBoundary>} />
                 <Route
                   path="/auth"
                   element={
-                    session ? <Navigate to="/dashboard" /> : <Auth />
+                    session ? 
+                      <Navigate to="/dashboard" /> : 
+                      <ErrorBoundary><Auth /></ErrorBoundary>
                   }
                 />
-                <Route path="/register" element={<Register />} />
-                <Route path="/discover" element={<Discover />} />
+                <Route path="/register" element={<ErrorBoundary><Register /></ErrorBoundary>} />
+                <Route path="/discover" element={<ErrorBoundary><Discover /></ErrorBoundary>} />
                 <Route
                   path="/dashboard"
                   element={
-                    session ? <Dashboard /> : <Navigate to="/auth" />
+                    session ? 
+                      <ErrorBoundary><Dashboard /></ErrorBoundary> : 
+                      <Navigate to="/auth" />
                   }
                 />
               </Routes>

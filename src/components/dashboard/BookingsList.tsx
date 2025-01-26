@@ -10,7 +10,7 @@ interface BookingsListProps {
   bookings: Booking[];
   isLoading: boolean;
   isProvider?: boolean;
-  onUpdateStatus: (bookingId: string, status: string) => void;
+  onUpdateStatus: (bookingId: string, status: 'accepted' | 'rejected') => void;
   onAddFeedback: (bookingId: string, feedback: { rating: number; comment: string }) => void;
 }
 

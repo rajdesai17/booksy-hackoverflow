@@ -2,8 +2,20 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserCircle, Briefcase } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Register = () => {
+  const navigate = useNavigate();
+
+  const handleSignUp = (userType: "customer" | "provider") => {
+    navigate("/auth", { 
+      state: { 
+        isLogin: false,
+        userType 
+      } 
+    });
+  };
+
   return (
     <div className="min-h-screen pt-24 pb-16 px-4">
       <div className="max-w-4xl mx-auto">
@@ -29,7 +41,12 @@ const Register = () => {
                 <p className="text-gray-600 mb-6">
                   Looking for reliable local services
                 </p>
-                <Button className="w-full bg-primary hover:bg-primary-dark">
+                <Button 
+                  type="button"
+                  onClick={() => handleSignUp("customer")}
+                  className="w-full bg-primary hover:bg-primary-dark"
+                  aria-label="Sign up as customer"
+                >
                   Sign Up as Customer
                 </Button>
               </div>
@@ -48,7 +65,12 @@ const Register = () => {
                 <p className="text-gray-600 mb-6">
                   Ready to offer my services to customers
                 </p>
-                <Button className="w-full bg-primary hover:bg-primary-dark">
+                <Button
+                  type="button" 
+                  onClick={() => handleSignUp("provider")}
+                  className="w-full bg-primary hover:bg-primary-dark"
+                  aria-label="Sign up as provider"
+                >
                   Sign Up as Provider
                 </Button>
               </div>

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CustomerBookings } from "@/components/dashboard/CustomerBookings";
 import { ProviderBookings } from "@/components/dashboard/ProviderBookings";
 import { ProviderFeedbacks } from "@/components/dashboard/ProviderFeedbacks";
+import { ServicesList } from "@/components/dashboard/ServicesList"; // Add this import
 
 const Dashboard = () => {
   const { data: profile, isLoading } = useQuery({
@@ -45,6 +46,7 @@ const Dashboard = () => {
         <div className="space-y-12">
           {profile?.user_type === "provider" ? (
             <>
+              <ServicesList providerId={profile.id} /> {/* Add this line */}
               <ProviderBookings />
               <ProviderFeedbacks />
             </>
