@@ -1,16 +1,40 @@
-## Project info
+## Project Info
 
 **Project Name**: Booksy  
+A modern web application connecting customers with local service providers. Built with React, TypeScript, and Supabase.
 
-**Use your preferred IDE**
+### Features
+- 🔐 User authentication (Customer/Provider)
+- 📅 Service booking system with time slots
+- 💼 Provider dashboard with booking management
+- 👤 Customer dashboard with booking history
+- ⭐ Review and rating system
+- 🔍 Service discovery by category and city
+- 📍 Multi-city support
+- 💫 Real-time booking updates
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Tech Stack
+- **Frontend**: React 18, TypeScript
+- **Styling**: Tailwind CSS, ShadcnUI
+- **State Management**: TanStack Query
+- **Backend**: Supabase
+- **Database**: PostgreSQL
+- **Authentication**: Supabase Auth
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
+- Node.js (v16 or higher)
+- npm/yarn
+- Supabase account
+
+### Environment Setup
+
+Create a `.env` file in the root directory.
+
+The only requirement is having Node.js & npm installed. You can install Node.js with [nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
 
 Follow these steps:
 
-```sh
+```bash
 # Step 1: Clone the repository using the project's Git URL.
 git clone <YOUR_GIT_URL>
 
@@ -22,29 +46,3 @@ npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
