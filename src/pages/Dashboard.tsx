@@ -134,45 +134,63 @@ const Dashboard = () => {
     queryKey: ["dashboard-stats", profile?.id],
     enabled: !!profile?.id && profile?.user_type === "provider",
     queryFn: async () => {
-      // Get only accepted bookings with price
+      // Get all bookings with service details for this provider
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           id,
-          service:services (price)
+          status,
+          service:services!inner (
+            id,
+            price,
+            provider_id
+          )
         `)
-        .eq('provider_id', profile.id)
-        .eq('status', 'accepted');
-      // Get all feedbacks
+        .eq('service.provider_id', profile.id);
+
+      // Get all feedbacks for this provider's services
       const { data: feedbacks, error: feedbacksError } = await supabase
         .from('feedbacks')
-        .select('rating')
-        .eq('provider_id', profile.id);
+        .select(`
+          rating,
+          booking:bookings!inner (
+            service:services!inner (
+              provider_id
+            )
+          )
+        `)
+        .eq('booking.service.provider_id', profile.id);
 
-      // Get active services
-      const { data: services, error: servicesError } = await supabase
-      .from('services')
-      .select('*')
-      .eq('provider_id', profile.id)
-      .eq('is_active', true);
+      // Get active services count
+      const { count: activeServicesCount, error: servicesError } = await supabase
+        .from('services')
+        .select('id', { count: true })
+        .eq('provider_id', profile.id)
+        .eq('is_active', true);
 
-    if (bookingsError || feedbacksError || servicesError) {
-      throw new Error('Failed to fetch stats');
-    }
+      if (bookingsError || feedbacksError || servicesError) {
+        throw new Error('Failed to fetch stats');
+      }
 
-      // Calculate income from accepted bookings
-      const totalIncome = bookings?.reduce((sum, booking) => 
-        sum + (booking.service?.price || 0), 0) || 0;
-  
-      const avgRating = feedbacks?.length 
-        ? feedbacks.reduce((acc, curr) => acc + curr.rating, 0) / feedbacks.length 
+      // Calculate metrics
+      const acceptedBookings = bookings?.filter(b => b.status === 'accepted' || b.status === 'completed') || [];
+      const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
+      
+      // Calculate total income from completed bookings
+      const totalIncome = completedBookings.reduce((sum, booking) => 
+        sum + (booking.service?.price || 0), 0);
+
+      // Calculate average rating
+      const validFeedbacks = feedbacks?.filter(f => f.rating > 0) || [];
+      const avgRating = validFeedbacks.length 
+        ? validFeedbacks.reduce((sum, f) => sum + f.rating, 0) / validFeedbacks.length 
         : 0;
-  
+
       return {
-        totalBookings: bookings?.length || 0,
-        avgRating: avgRating.toFixed(1),
-        activeServices: services?.length || 0,
-        totalIncome: totalIncome.toFixed(2)
+        totalBookings: acceptedBookings.length,
+        avgRating: Number(avgRating.toFixed(1)),
+        activeServices: activeServicesCount || 0,
+        totalIncome: Number(totalIncome.toFixed(2))
       };
     }
   });
@@ -235,8 +253,10 @@ const Dashboard = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries(['bookings']);
       queryClient.invalidateQueries(['dashboard-stats']);
+      queryClient.invalidateQueries(['provider-bookings']);
     }
   });
 
@@ -287,27 +307,6 @@ const Dashboard = () => {
     }
   });
 
-  // Add feedback submission mutation
-  const submitFeedback = useMutation<void, Error, { bookingId: string; rating: number; comment: string }>({
-    mutationFn: async ({ bookingId, rating, comment }) => {
-      const { error } = await supabase
-        .from('feedbacks')
-        .insert([
-          {
-            booking_id: bookingId,
-            rating,
-            comment,
-          },
-        ]);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      setSelectedBooking(null);
-      setFormRating(0);
-    },
-  });
-
   // Update the bookings query
   const { data: bookings } = useQuery({
     queryKey: ['bookings'],
@@ -343,6 +342,28 @@ const Dashboard = () => {
       comment: formData.get('comment') as string,
     });
   };
+
+  // Update the submitFeedback mutation to invalidate stats
+  const submitFeedback = useMutation<void, Error, { bookingId: string; rating: number; comment: string }>({
+    mutationFn: async ({ bookingId, rating, comment }) => {
+      const { error } = await supabase
+        .from('feedbacks')
+        .insert([
+          {
+            booking_id: bookingId,
+            rating,
+            comment,
+          },
+        ]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      setSelectedBooking(null);
+      setFormRating(0);
+    },
+  });
 
   if (userLoading || profileLoading || servicesLoading || userBookingsLoading) {
     return (
