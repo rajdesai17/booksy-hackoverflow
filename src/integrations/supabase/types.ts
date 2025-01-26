@@ -54,6 +54,38 @@ export type Database = {
           },
         ]
       }
+      feedbacks: {
+        Row: {
+          booking_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          rating: number
+        }
+        Insert: {
+          booking_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+        }
+        Update: {
+          booking_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_booking"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           city: string | null
