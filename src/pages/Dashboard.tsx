@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Service {
   id: string;
@@ -34,6 +35,17 @@ interface Booking {
   };
 }
 
+const categories = [
+  "Haircuts",
+  "Home Repairs",
+  "Cleaning",
+  "Gardening",
+  "Personal Training",
+  "Pet Care",
+];
+
+const cities = ["Mumbai", "Pune", "Bangalore"];
+
 const Dashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -42,8 +54,8 @@ const Dashboard = () => {
     title: "",
     description: "",
     price: 0,
-    category: "Haircuts", // Default category
-    city: "Mumbai", // Default city
+    category: "Haircuts",
+    city: "Mumbai",
   });
 
   const { data: user } = useQuery({
@@ -99,9 +111,9 @@ const Dashboard = () => {
             title,
             description,
             price,
-            provider_id,
             category,
             city,
+            provider_id,
             provider:profiles(full_name)
           ),
           customer:profiles(full_name)
@@ -213,17 +225,39 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Category</label>
-                  <Input
+                  <Select
                     value={newService.category}
-                    onChange={(e) => setNewService({ ...newService, category: e.target.value })}
-                  />
+                    onValueChange={(value) => setNewService({ ...newService, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">City</label>
-                  <Input
+                  <Select
                     value={newService.city}
-                    onChange={(e) => setNewService({ ...newService, city: e.target.value })}
-                  />
+                    onValueChange={(value) => setNewService({ ...newService, city: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button onClick={handleAddService}>Create Service</Button>
               </div>

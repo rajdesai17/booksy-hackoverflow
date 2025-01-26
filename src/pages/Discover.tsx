@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Search, Star, MapPin } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const categories = [
   { id: 1, name: "Haircuts", icon: "💇‍♂️" },
@@ -32,9 +34,19 @@ interface Service {
 }
 
 const Discover = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState([0, 1000]);
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
+    },
+  });
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services', selectedCategory, selectedCity, priceRange],
@@ -65,8 +77,45 @@ const Discover = () => {
     },
   });
 
+  const createBooking = useMutation({
+    mutationFn: async ({ serviceId }: { serviceId: string }) => {
+      if (!user) throw new Error("User not authenticated");
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([{
+          service_id: serviceId,
+          customer_id: user.id,
+          booking_date: new Date().toISOString(),
+          status: 'pending'
+        }]);
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Booking request sent successfully",
+      });
+    },
+  });
+
   const handleCategoryClick = (categoryName: string) => {
     setSelectedCategory(categoryName);
+  };
+
+  const handleBookService = (serviceId: string) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Please login to book a service",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createBooking.mutate({ serviceId });
   };
 
   return (
@@ -86,7 +135,6 @@ const Discover = () => {
                       <SelectValue placeholder="Select city" />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* Removed the empty value SelectItem */}
                       {cities.map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
@@ -170,7 +218,13 @@ const Discover = () => {
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Provided by</p>
-                            <p className="font-medium">{service.provider?.full_name}</p>
+                            <p className="font-medium mb-4">{service.provider?.full_name}</p>
+                            <Button 
+                              onClick={() => handleBookService(service.id)}
+                              variant="default"
+                            >
+                              Book Now
+                            </Button>
                           </div>
                         </div>
                       </Card>
