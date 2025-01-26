@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
 import { useMutation } from "@tanstack/react-query";
+import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { format } from "date-fns";
 
 const categories = [
   { id: 1, name: "Haircuts", icon: "💇‍♂️" },
@@ -20,12 +23,27 @@ const categories = [
 
 const cities = ["Mumbai", "Pune", "Bangalore"];
 
+const timeSlots = [
+  "09:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "12:00 PM",
+  "02:00 PM",
+  "03:00 PM",
+  "04:00 PM",
+  "05:00 PM"
+];
+
 const Discover = () => {
   const { toast } = useToast();
   const { data: user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const [bookingDate, setBookingDate] = useState<Date | undefined>();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
 
   // Simplified services query
   const { data: services, isLoading: servicesLoading } = useQuery({
@@ -95,7 +113,17 @@ const Discover = () => {
 
   // Add booking mutation
   const createBooking = useMutation({
-    mutationFn: async ({ serviceId, providerId }: { serviceId: string; providerId: string }) => {
+    mutationFn: async ({ 
+      serviceId, 
+      providerId, 
+      bookingDate,
+      timeSlot 
+    }: { 
+      serviceId: string; 
+      providerId: string;
+      bookingDate: Date;
+      timeSlot: string;
+    }) => {
       if (!user) throw new Error("User not authenticated");
 
       const { data, error } = await supabase
@@ -105,7 +133,8 @@ const Discover = () => {
           customer_id: user.id,
           provider_id: providerId,
           status: 'pending',
-          booking_date: new Date().toISOString()
+          booking_date: bookingDate.toISOString(),
+          time_slot: timeSlot
         }])
         .select();
 
@@ -137,7 +166,7 @@ const Discover = () => {
     setSelectedCity(null);
   };
 
-  const handleBookService = async (serviceId: string, providerId: string) => {
+  const handleBookService = (service: any) => {
     if (!user) {
       toast({
         title: "Error",
@@ -147,7 +176,7 @@ const Discover = () => {
       return;
     }
 
-    if (user.id === providerId) {
+    if (user.id === service.provider_id) {
       toast({
         title: "Error",
         description: "You cannot book your own service",
@@ -156,28 +185,8 @@ const Discover = () => {
       return;
     }
 
-    try {
-      // Check for existing bookings
-      const { data: existingBookings } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('service_id', serviceId)
-        .eq('customer_id', user.id)
-        .in('status', ['pending', 'accepted']);
-
-      if (existingBookings && existingBookings.length > 0) {
-        toast({
-          title: "Error",
-          description: "You already have an active booking for this service",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      createBooking.mutate({ serviceId, providerId });
-    } catch (error) {
-      console.error('Booking check error:', error);
-    }
+    setSelectedService(service);
+    setShowBookingDialog(true);
   };
 
   return (
@@ -262,7 +271,7 @@ const Discover = () => {
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             <Button
-                              onClick={() => handleBookService(service.id, service.provider_id)}
+                              onClick={() => handleBookService(service)}
                               disabled={createBooking.isLoading || !user}
                               className="w-full"
                             >
@@ -286,6 +295,56 @@ const Discover = () => {
           </div>
         </div>
       </div>
+      <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Book Service</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Select Date</h3>
+              <Calendar
+                mode="single"
+                selected={bookingDate}
+                onSelect={setBookingDate}
+                disabled={(date) => date < new Date()}
+                className="rounded-md border"
+              />
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-2">Select Time Slot</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {timeSlots.map((slot) => (
+                  <Button
+                    key={slot}
+                    variant={selectedTimeSlot === slot ? "default" : "outline"}
+                    onClick={() => setSelectedTimeSlot(slot)}
+                  >
+                    {slot}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={!bookingDate || !selectedTimeSlot}
+              onClick={() => {
+                createBooking.mutate({
+                  serviceId: selectedService.id,
+                  providerId: selectedService.provider_id,
+                  bookingDate: bookingDate!,
+                  timeSlot: selectedTimeSlot
+                });
+                setShowBookingDialog(false);
+              }}
+            >
+              Confirm Booking
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

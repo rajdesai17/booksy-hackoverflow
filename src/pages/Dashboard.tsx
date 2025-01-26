@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/hooks/useUser"; // Remove extra 'c'
 import { Button } from "@/components/ui/button";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { EditProfileDialog } from "@/components/dashboard/EditProfileDialog";
 import { toast } from "@/components/ui/use-toast";
 
@@ -88,6 +88,7 @@ const Dashboard = () => {
   const [formRating, setFormRating] = useState(0);
   const queryClient = useQueryClient();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const navigate = useNavigate();
 
   // Get user profile
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -235,21 +236,16 @@ const Dashboard = () => {
             id,
             status,
             booking_date,
-            created_at,
-            service_id,
-            provider_id,
-            services (
+            service:services (
               id,
               title,
               price,
-              provider_id,
               provider:profiles (
                 id,
                 full_name
               )
             ),
             feedbacks (
-              id,
               rating,
               comment
             )
@@ -258,17 +254,16 @@ const Dashboard = () => {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('Error fetching bookings:', error);
+          console.error("Supabase error:", error);
           throw error;
         }
 
-        console.log('Fetched user bookings:', data); // Debug log
-        return data;
+        return data || [];
       } catch (error) {
-        console.error('Query error:', error);
+        console.error("Query error:", error);
         return [];
       }
-    }
+    },
   });
 
   // Update booking status mutation to invalidate stats
@@ -468,13 +463,7 @@ const Dashboard = () => {
                 </div>
               </Card>
               
-              <Card className="p-4 flex items-center gap-4">
-                <Briefcase className="w-10 h-10 text-green-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Active Services</p>
-                  <p className="text-2xl font-semibold">{stats?.activeServices || 0}</p>
-                </div>
-              </Card>
+            
             
               <Card className="p-4 flex items-center gap-4">
                 <IndianRupee className="w-10 h-10 text-emerald-500" />
@@ -592,51 +581,44 @@ const Dashboard = () => {
                 <Users className="w-6 h-6 text-primary" />
                 <h2 className="text-2xl font-semibold">My Bookings</h2>
               </div>
-              <div className="space-y-4">
-                {bookingsLoading ? (
-                  <div className="text-center py-8">Loading bookings...</div>
-                ) : userBookings && userBookings.length > 0 ? (
-                  <div className="space-y-4">
-                    {userBookings.map((booking) => (
-                      <Card key={booking.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold">{booking.service?.title}</h3>
-                            <p className="text-sm text-gray-600">
-                              Provider: {booking.service?.provider?.full_name}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Price: ₹{booking.service?.price}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Date: {new Date(booking.booking_date).toLocaleDateString()}
-                            </p>
-                            <div className="mt-2">
-                              <Badge variant={getStatusBadgeVariant(booking.status)}>
-                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                              </Badge>
-                            </div>
-                          </div>
-                          {booking.status === 'completed' && !booking.feedbacks?.[0] && (
-                            <Button
-                              onClick={() => setSelectedBooking(booking)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Star className="w-4 h-4 mr-2" />
-                              Add Review
-                            </Button>
-                          )}
+              
+              {bookingsLoading ? (
+                <div>Loading...</div>
+              ) : (
+                <div className="space-y-4">
+                  {userBookings?.map((booking) => (
+                    <Card key={booking.id} className="p-4">
+                      <div className="flex justify-between">
+                        <div>
+                          <h3 className="font-semibold">{booking.service?.title}</h3>
+                          <p className="text-sm text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
+                          <p className="text-sm text-gray-600">Price: ₹{booking.service?.price}</p>
+                          <Badge variant={getStatusBadgeVariant(booking.status)}>
+                            {booking.status}
+                          </Badge>
                         </div>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No bookings found</p>
-                  </div>
-                )}
-              </div>
+                        {booking.status === 'completed' && !booking.feedbacks?.length && (
+                          <Button 
+                            onClick={() => setSelectedBooking(booking)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Add Review
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                  {!userBookings?.length && (
+                    <div className="text-center py-4">
+                      <p className="text-gray-500">No bookings found</p>
+                      <Button onClick={() => navigate('/discover')} className="mt-4">
+                        Browse Services
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

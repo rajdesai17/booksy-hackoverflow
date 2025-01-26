@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import HeroHighlight from "@/components/HeroHighlight";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Search, Calendar } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Home = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -27,7 +30,7 @@ const Home = () => {
             transition={{ delay: 0.7 }}
             className="mt-8"
           >
-            <Button onClick={() => router.push('/discover')} size="lg" className="bg-primary hover:bg-primary-dark">
+            <Button onClick={() => navigate('/discover')} size="lg" className="bg-primary hover:bg-primary-dark">
               Get Started
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
