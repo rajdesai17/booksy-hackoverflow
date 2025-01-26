@@ -12,5 +12,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     storage: window.localStorage // Explicitly set storage
+  },
+  db: {
+    schema: 'public'
   }
 });

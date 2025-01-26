@@ -61,14 +61,24 @@ export const CustomerBookings = () => {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          *,
+          id,
+          status,
+          created_at,
+          service_id,
           service:services (
+            id,
             title,
             price,
-            provider:profiles (
-              full_name,
-              provider_id
+            provider_id,
+            provider:profiles!services_provider_id_fkey (
+              id,
+              full_name
             )
+          ),
+          feedback:feedbacks (
+            id,
+            rating,
+            comment
           )
         `)
         .eq("customer_id", user.id)
