@@ -17,16 +17,60 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [userType, setUserType] = useState<"customer" | "provider" | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const validateForm = () => {
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please fill in all required fields",
+      });
+      return false;
+    }
+
+    if (!isLogin && (!fullName || !userType)) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please fill in all registration fields",
+      });
+      return false;
+    }
+
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+      });
+      return false;
+    }
+
+    return true;
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
+
     try {
+      setLoading(true);
+      
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        if (error) throw error;
+        
+        if (error) {
+          if (error.message === "Invalid login credentials") {
+            throw new Error("Invalid email or password");
+          }
+          throw error;
+        }
+        
         navigate("/dashboard");
       } else {
         const { error } = await supabase.auth.signUp({
@@ -39,7 +83,9 @@ const Auth = () => {
             },
           },
         });
+        
         if (error) throw error;
+        
         toast({
           title: "Registration successful!",
           description: "Please check your email to verify your account.",
@@ -51,6 +97,8 @@ const Auth = () => {
         title: "Error",
         description: error.message,
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,6 +132,7 @@ const Auth = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
+                    disabled={loading}
                   />
                 </div>
 
@@ -95,6 +144,7 @@ const Auth = () => {
                       variant={userType === "customer" ? "default" : "outline"}
                       className="w-full"
                       onClick={() => setUserType("customer")}
+                      disabled={loading}
                     >
                       <UserCircle className="w-4 h-4 mr-2" />
                       Customer
@@ -104,6 +154,7 @@ const Auth = () => {
                       variant={userType === "provider" ? "default" : "outline"}
                       className="w-full"
                       onClick={() => setUserType("provider")}
+                      disabled={loading}
                     >
                       <Briefcase className="w-4 h-4 mr-2" />
                       Provider
@@ -121,6 +172,7 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -132,11 +184,12 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              {isLogin ? "Sign In" : "Sign Up"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
             </Button>
           </form>
 
@@ -145,6 +198,7 @@ const Auth = () => {
               type="button"
               onClick={() => setIsLogin(!isLogin)}
               className="text-primary hover:underline"
+              disabled={loading}
             >
               {isLogin
                 ? "Don't have an account? Sign up"
