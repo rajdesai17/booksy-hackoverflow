@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Search, Star } from "lucide-react";
+import { Search, Star, MapPin } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const categories = [
   { id: 1, name: "Haircuts", icon: "💇‍♂️" },
@@ -14,8 +17,57 @@ const categories = [
   { id: 6, name: "Pet Care", icon: "🐾" },
 ];
 
+const cities = ["Mumbai", "Pune", "Bangalore"];
+
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  city: string;
+  category: string;
+  provider: {
+    full_name: string;
+  };
+}
+
 const Discover = () => {
-  const [priceRange, setPriceRange] = useState([0, 100]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [priceRange, setPriceRange] = useState([0, 1000]);
+
+  const { data: services, isLoading } = useQuery({
+    queryKey: ['services', selectedCategory, selectedCity, priceRange],
+    queryFn: async () => {
+      let query = supabase
+        .from('services')
+        .select(`
+          *,
+          provider:profiles(full_name)
+        `)
+        .gte('price', priceRange[0])
+        .lte('price', priceRange[1]);
+
+      if (selectedCategory) {
+        query = query.eq('category', selectedCategory);
+      }
+      if (selectedCity) {
+        query = query.eq('city', selectedCity);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      return data as Service[];
+    },
+  });
+
+  const handleCategoryClick = (categoryName: string) => {
+    setSelectedCategory(categoryName);
+  };
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -28,50 +80,35 @@ const Discover = () => {
               
               <div className="space-y-6">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Location</label>
-                  <div className="mt-1 relative">
-                    <Input
-                      type="text"
-                      placeholder="Enter your location"
-                      className="w-full"
-                    />
-                    <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                  </div>
+                  <label className="text-sm font-medium text-gray-700">City</label>
+                  <Select onValueChange={(value) => setSelectedCity(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Cities</SelectItem>
+                      {cities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-gray-700">Price Range</label>
                   <div className="mt-4">
                     <Slider
-                      defaultValue={[0, 100]}
-                      max={100}
-                      step={1}
+                      defaultValue={[0, 1000]}
+                      max={1000}
+                      step={10}
                       className="w-full"
                       onValueChange={(value) => setPriceRange(value)}
                     />
                     <div className="mt-2 text-sm text-gray-600">
-                      ${priceRange[0]} - ${priceRange[1]}
+                      ₹{priceRange[0]} - ₹{priceRange[1]}
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Rating</label>
-                  <div className="mt-2 space-y-2">
-                    {[5, 4, 3].map((rating) => (
-                      <label key={rating} className="flex items-center">
-                        <input type="checkbox" className="rounded text-primary" />
-                        <span className="ml-2 flex items-center">
-                          {Array.from({ length: rating }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className="h-4 w-4 text-yellow-400 fill-current"
-                            />
-                          ))}
-                          <span className="ml-1 text-sm text-gray-600">& up</span>
-                        </span>
-                      </label>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -80,23 +117,72 @@ const Discover = () => {
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category, index) => (
-                <motion.div
-                  key={category.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                    <div className="text-center">
-                      <span className="text-4xl mb-4 block">{category.icon}</span>
-                      <h3 className="text-lg font-semibold">{category.name}</h3>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+            {/* Categories Grid */}
+            {!selectedCategory && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {categories.map((category, index) => (
+                  <motion.div
+                    key={category.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    onClick={() => handleCategoryClick(category.name)}
+                  >
+                    <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                      <div className="text-center">
+                        <span className="text-4xl mb-4 block">{category.icon}</span>
+                        <h3 className="text-lg font-semibold">{category.name}</h3>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* Services List */}
+            {selectedCategory && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold">{selectedCategory}</h2>
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-primary hover:underline"
+                  >
+                    Back to Categories
+                  </button>
+                </div>
+
+                {isLoading ? (
+                  <div className="text-center py-8">Loading services...</div>
+                ) : services && services.length > 0 ? (
+                  <div className="grid gap-6">
+                    {services.map((service) => (
+                      <Card key={service.id} className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
+                            <p className="text-gray-600 mb-2">{service.description}</p>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <MapPin className="w-4 h-4 mr-1" />
+                              {service.city}
+                            </div>
+                            <p className="text-lg font-semibold mt-2">₹{service.price}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-500">Provided by</p>
+                            <p className="font-medium">{service.provider?.full_name}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No services found for the selected filters.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

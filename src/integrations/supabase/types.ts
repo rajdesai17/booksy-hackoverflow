@@ -56,6 +56,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          city: string | null
           created_at: string
           full_name: string | null
           id: string
@@ -63,6 +64,7 @@ export type Database = {
           user_type: string | null
         }
         Insert: {
+          city?: string | null
           created_at?: string
           full_name?: string | null
           id: string
@@ -70,6 +72,7 @@ export type Database = {
           user_type?: string | null
         }
         Update: {
+          city?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
@@ -80,6 +83,8 @@ export type Database = {
       }
       services: {
         Row: {
+          category: string
+          city: string
           created_at: string
           description: string | null
           id: string
@@ -89,6 +94,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category: string
+          city: string
           created_at?: string
           description?: string | null
           id?: string
@@ -98,6 +105,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string
+          city?: string
           created_at?: string
           description?: string | null
           id?: string
