@@ -1,12 +1,10 @@
 {
-  "routes": [
-    { "src": "/", "dest": "/" },
-    { "src": "/discover", "dest": "/" },
-    { "src": "/dashboard", "dest": "/" },
-    { "src": "/[^.]+", "dest": "/", "status": 200 }
-  ],
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/" }
   ],
   "headers": [
     {
@@ -21,7 +19,5 @@
   ],
   "github": {
     "silent": true
-  },
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  }
 }
