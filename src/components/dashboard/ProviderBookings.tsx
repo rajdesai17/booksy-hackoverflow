@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
+import { Check, X, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking } from "@/types/booking";
 
@@ -29,7 +29,7 @@ export const ProviderBookings = () => {
   });
 
   const updateBookingStatus = useMutation({
-    mutationFn: async ({ bookingId, status }: { bookingId: string; status: 'accepted' | 'rejected' }) => {
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: 'accepted' | 'rejected' | 'completed' }) => {
       const { data, error } = await supabase
         .from('bookings')
         .update({ 
@@ -62,7 +62,7 @@ export const ProviderBookings = () => {
     }
   });
 
-  const handleStatusUpdate = async (bookingId: string, status: 'accepted' | 'rejected') => {
+  const handleStatusUpdate = async (bookingId: string, status: 'accepted' | 'rejected' | 'completed') => {
     try {
       await updateBookingStatus.mutateAsync({ bookingId, status });
     } catch (error) {
@@ -101,6 +101,26 @@ export const ProviderBookings = () => {
                   <X className="w-4 h-4 mr-2" />
                   Reject
                 </Button>
+              </div>
+            )}
+
+            {booking.status === 'accepted' && (
+              <div className="space-x-2">
+                <Button
+                  onClick={() => handleStatusUpdate(booking.id, 'completed')}
+                  disabled={updateBookingStatus.isLoading}
+                  variant="success"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Mark Complete
+                </Button>
+              </div>
+            )}
+
+            {booking.status === 'completed' && (
+              <div className="flex items-center text-green-600">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Completed
               </div>
             )}
           </div>
