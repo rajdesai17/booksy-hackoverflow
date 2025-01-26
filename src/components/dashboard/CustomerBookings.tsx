@@ -3,8 +3,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"; // Add this import
 import { Star, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+// Add helper function for badge variants
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'success';
+    case 'accepted':
+      return 'default';
+    case 'pending':
+      return 'warning';
+    case 'rejected':
+      return 'destructive';
+    default:
+      return 'secondary';
+  }
+};
 
 export const CustomerBookings = () => {
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
