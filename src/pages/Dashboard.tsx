@@ -4,16 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Check, X, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Service {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   price: number;
   provider_id: string;
-  provider: {
+  provider?: {
     full_name: string;
   };
 }
@@ -103,13 +103,18 @@ const Dashboard = () => {
 
   // Mutation for creating a service
   const createService = useMutation({
-    mutationFn: async (serviceData: Partial<Service>) => {
+    mutationFn: async (serviceData: { title: string; description: string; price: number }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
       const { data, error } = await supabase
         .from("services")
-        .insert([{ ...serviceData, provider_id: user.id }])
+        .insert([{ 
+          title: serviceData.title,
+          description: serviceData.description,
+          price: serviceData.price,
+          provider_id: user.id 
+        }])
         .select()
         .single();
 
@@ -196,12 +201,25 @@ const Dashboard = () => {
 
   const handleAddService = () => {
     const title = prompt("Enter service title:");
+    if (!title) return;
+    
     const description = prompt("Enter service description:");
-    const price = parseFloat(prompt("Enter service price:") || "0");
-
-    if (title && description && price) {
-      createService.mutate({ title, description, price });
+    if (!description) return;
+    
+    const priceStr = prompt("Enter service price:");
+    if (!priceStr) return;
+    
+    const price = parseFloat(priceStr);
+    if (isNaN(price)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid price",
+        description: "Please enter a valid number for the price",
+      });
+      return;
     }
+
+    createService.mutate({ title, description, price });
   };
 
   const handleBookService = (serviceId: string) => {
@@ -280,7 +298,7 @@ const Dashboard = () => {
                     {userType === "provider" ? (
                       <p>Customer: {booking.customer.full_name}</p>
                     ) : (
-                      <p>Provider: {booking.service.provider.full_name}</p>
+                      <p>Provider: {booking.service.provider?.full_name}</p>
                     )}
                     <p>Date: {new Date(booking.booking_date).toLocaleDateString()}</p>
                   </div>
