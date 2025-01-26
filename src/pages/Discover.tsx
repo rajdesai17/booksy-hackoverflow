@@ -38,36 +38,16 @@ const Discover = () => {
     },
   });
 
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['services', selectedCategory, selectedCity, priceRange],
+  // Update services query to only show active services
+  const { data: services } = useQuery({
+    queryKey: ["services"],
     queryFn: async () => {
-      let query = supabase
-        .from('services')
-        .select(`
-          *,
-          provider:profiles(
-            id,
-            full_name,
-            city
-          )
-        `)
-        .gte('price', priceRange[0])
-        .lte('price', priceRange[1]);
-
-      if (selectedCategory) {
-        query = query.eq('category', selectedCategory);
-      }
-      if (selectedCity) {
-        query = query.eq('city', selectedCity);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      return data as Service[];
+      const { data, error } = await supabase
+        .from("services")
+        .select("*, provider:profiles(*)")
+        .eq('is_active', true);
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -121,7 +101,7 @@ const Discover = () => {
     },
   });
 
-  const handleBookService = (serviceId: string) => {
+  const handleBookService = async (serviceId: string, providerId: string) => {
     if (!user) {
       toast({
         title: "Error",
@@ -130,10 +110,46 @@ const Discover = () => {
       });
       return;
     }
-
+  
+    // Check if user is the service provider
+    if (user.id === providerId) {
+      toast({
+        title: "Error",
+        description: "You cannot book your own service",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    // Check for existing bookings
+    const { data: existingBookings } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('service_id', serviceId)
+      .eq('customer_id', user.id)
+      .in('status', ['pending', 'accepted']);
+  
+    if (existingBookings && existingBookings.length > 0) {
+      toast({
+        title: "Error",
+        description: "You already have an active booking for this service",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    // If all checks pass, create booking
     createBooking.mutate({ serviceId });
   };
-
+  
+  // Update the Book Now button
+  <Button 
+    onClick={() => handleBookService(service.id, service.provider_id)}
+    variant="default"
+    disabled={createBooking.isLoading}
+  >
+    {createBooking.isLoading ? "Sending..." : "Book Now"}
+  </Button>
   const handleCategoryClick = (categoryName: string) => {
     setSelectedCategory(categoryName);
   };
