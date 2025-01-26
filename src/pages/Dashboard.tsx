@@ -21,6 +21,8 @@ import { useState } from "react"; // Remove extra 'i'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/hooks/useUser"; // Remove extra 'c'
+import { Button } from "@/components/ui/button";
+import { Navigate } from "react-router-dom";
 const categories = [
   "Haircuts",
   "Home Repairs", 
@@ -58,6 +60,21 @@ interface Booking {
     comment: string;
   };
 }
+
+const getStatusBadgeVariant = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'completed':
+      return 'success';
+    case 'accepted':
+      return 'default';
+    case 'pending':
+      return 'warning';
+    case 'rejected':
+      return 'destructive';
+    default:
+      return 'secondary';
+  }
+};
 
 const Dashboard = () => {
   const { data: user, isLoading: userLoading } = useUser();
@@ -117,45 +134,63 @@ const Dashboard = () => {
     queryKey: ["dashboard-stats", profile?.id],
     enabled: !!profile?.id && profile?.user_type === "provider",
     queryFn: async () => {
-      // Get only accepted bookings with price
+      // Get all bookings with service details for this provider
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           id,
-          service:services (price)
+          status,
+          service:services!inner (
+            id,
+            price,
+            provider_id
+          )
         `)
-        .eq('provider_id', profile.id)
-        .eq('status', 'accepted');
-      // Get all feedbacks
+        .eq('service.provider_id', profile.id);
+
+      // Get all feedbacks for this provider's services
       const { data: feedbacks, error: feedbacksError } = await supabase
         .from('feedbacks')
-        .select('rating')
-        .eq('provider_id', profile.id);
+        .select(`
+          rating,
+          booking:bookings!inner (
+            service:services!inner (
+              provider_id
+            )
+          )
+        `)
+        .eq('booking.service.provider_id', profile.id);
 
-      // Get active services
-      const { data: services, error: servicesError } = await supabase
-      .from('services')
-      .select('*')
-      .eq('provider_id', profile.id)
-      .eq('is_active', true);
+      // Get active services count
+      const { count: activeServicesCount, error: servicesError } = await supabase
+        .from('services')
+        .select('id', { count: true })
+        .eq('provider_id', profile.id)
+        .eq('is_active', true);
 
-    if (bookingsError || feedbacksError || servicesError) {
-      throw new Error('Failed to fetch stats');
-    }
+      if (bookingsError || feedbacksError || servicesError) {
+        throw new Error('Failed to fetch stats');
+      }
 
-      // Calculate income from accepted bookings
-      const totalIncome = bookings?.reduce((sum, booking) => 
-        sum + (booking.service?.price || 0), 0) || 0;
-  
-      const avgRating = feedbacks?.length 
-        ? feedbacks.reduce((acc, curr) => acc + curr.rating, 0) / feedbacks.length 
+      // Calculate metrics
+      const acceptedBookings = bookings?.filter(b => b.status === 'accepted' || b.status === 'completed') || [];
+      const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
+      
+      // Calculate total income from completed bookings
+      const totalIncome = completedBookings.reduce((sum, booking) => 
+        sum + (booking.service?.price || 0), 0);
+
+      // Calculate average rating
+      const validFeedbacks = feedbacks?.filter(f => f.rating > 0) || [];
+      const avgRating = validFeedbacks.length 
+        ? validFeedbacks.reduce((sum, f) => sum + f.rating, 0) / validFeedbacks.length 
         : 0;
-  
+
       return {
-        totalBookings: bookings?.length || 0,
-        avgRating: avgRating.toFixed(1),
-        activeServices: services?.length || 0,
-        totalIncome: totalIncome.toFixed(2)
+        totalBookings: acceptedBookings.length,
+        avgRating: Number(avgRating.toFixed(1)),
+        activeServices: activeServicesCount || 0,
+        totalIncome: Number(totalIncome.toFixed(2))
       };
     }
   });
@@ -186,11 +221,18 @@ const Dashboard = () => {
         .select(`
           *,
           service:services (
+            id,
             title,
             price,
             provider:profiles (
+              id,
               full_name
             )
+          ),
+          feedback:feedbacks (
+            id,
+            rating,
+            comment
           )
         `)
         .eq("customer_id", user.id)
@@ -211,8 +253,10 @@ const Dashboard = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries(['bookings']);
       queryClient.invalidateQueries(['dashboard-stats']);
+      queryClient.invalidateQueries(['provider-bookings']);
     }
   });
 
@@ -263,7 +307,43 @@ const Dashboard = () => {
     }
   });
 
-  // Add feedback submission mutation
+  // Update the bookings query
+  const { data: bookings } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          service:services(
+            *,
+            provider:profiles(*)
+          )
+        `)
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
+  
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Update feedback dialog submit handler
+  const handleFeedbackSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    submitFeedback.mutate({
+      bookingId: selectedBooking?.id!,
+      rating: Number(formData.get('rating')),
+      comment: formData.get('comment') as string,
+    });
+  };
+
+  // Update the submitFeedback mutation to invalidate stats
   const submitFeedback = useMutation<void, Error, { bookingId: string; rating: number; comment: string }>({
     mutationFn: async ({ bookingId, rating, comment }) => {
       const { error } = await supabase
@@ -279,46 +359,11 @@ const Dashboard = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       setSelectedBooking(null);
       setFormRating(0);
     },
   });
-
-  // Update the bookings query to include sorting
-  const { data: bookings } = useQuery({
-    queryKey: ['bookings'],
-    queryFn: async () => {
-      if (!user) throw new Error("User not authenticated");
-      
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          service:services(
-            *,
-            provider:profiles(*)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-  
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user, // Only run query when user exists
-  });
-
-  // Update feedback dialog submit handler
-  const handleFeedbackSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    submitFeedback.mutate({
-      bookingId: selectedBooking?.id!,
-      rating: Number(formData.get('rating')),
-      comment: formData.get('comment') as string,
-    });
-  };
 
   if (userLoading || profileLoading || servicesLoading || userBookingsLoading) {
     return (
@@ -507,12 +552,14 @@ const Dashboard = () => {
                         <h3 className="font-semibold">{booking.service?.title}</h3>
                         <p className="text-sm text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
                         <p className="text-sm text-gray-600">Price: ₹{booking.service?.price}</p>
-                        <Badge variant={getStatusBadgeVariant(booking.status)}>
-                          {booking.status}
-                        </Badge>
+                        <div className="mt-2">
+                          <Badge variant={getStatusBadgeVariant(booking.status)}>
+                            {booking.status}
+                          </Badge>
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        {booking.status === 'completed' && !booking.feedback && (
+                        {booking.status === 'completed' && !booking.feedback?.[0] && (
                           <Button
                             onClick={() => setSelectedBooking(booking)}
                             variant="outline"
@@ -526,6 +573,11 @@ const Dashboard = () => {
                     </div>
                   </Card>
                 ))}
+                {userBookings?.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No bookings found. Browse services in the Discover section to make a booking.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -692,6 +744,48 @@ const Dashboard = () => {
                 {addService.isLoading ? 'Adding...' : 'Add Service'}
               </button>
             </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Feedback Dialog */}
+      <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Feedback</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Rating</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => setFormRating(rating)}
+                    className={`p-1 ${
+                      rating <= formRating ? 'text-yellow-400' : 'text-gray-300'
+                    }`}
+                  >
+                    <Star className="w-6 h-6" />
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="rating" value={formRating} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Comment</label>
+              <textarea
+                name="comment"
+                required
+                className="w-full p-2 border rounded-md"
+                rows={3}
+                placeholder="Share your experience..."
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Submit Feedback
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
