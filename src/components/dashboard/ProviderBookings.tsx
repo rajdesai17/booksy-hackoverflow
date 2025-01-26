@@ -5,25 +5,41 @@ import { Button } from "@/components/ui/button";
 import { Check, X, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking } from "@/types/booking";
+import { useUser } from "@/hooks/useUser";
 
 export const ProviderBookings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: user } = useUser();
 
-  // Add this query hook
+  // Update the query to filter by provider_id
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ["provider-bookings"],
+    queryKey: ["provider-bookings", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bookings")
         .select(`
-          *,
-          service:services(*),
-          customer:profiles(*)
+          id,
+          status,
+          booking_date,
+          service:services!inner(
+            id,
+            title,
+            price
+          ),
+          customer:profiles!bookings_customer_id_fkey(
+            id,
+            full_name
+          )
         `)
+        .eq('provider_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Bookings query error:', error);
+        throw error;
+      }
       return data;
     }
   });

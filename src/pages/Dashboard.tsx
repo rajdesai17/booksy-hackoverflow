@@ -18,13 +18,14 @@ import {
   History,
   User
 } from "lucide-react";
-import { useState } from "react"; // Remove extra 'i'
+import { useState, useEffect } from "react"; // Remove extra 'i'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/hooks/useUser"; // Remove extra 'c'
 import { Button } from "@/components/ui/button";
 import { Navigate } from "react-router-dom";
 import { EditProfileDialog } from "@/components/dashboard/EditProfileDialog";
+import { toast } from "@/components/ui/use-toast";
 
 const categories = [
   "Haircuts",
@@ -65,7 +66,7 @@ interface Booking {
 }
 
 const getStatusBadgeVariant = (status: string) => {
-  switch (status.toLowerCase()) {
+  switch (status) {
     case 'completed':
       return 'success';
     case 'accepted':
@@ -80,7 +81,7 @@ const getStatusBadgeVariant = (status: string) => {
 };
 
 const Dashboard = () => {
-  const { data: user, isLoading: userLoading } = useUser();
+  const { data: user } = useUser();
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isAddingService, setIsAddingService] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -88,6 +89,7 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
+  // Get user profile
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     enabled: !!user?.id,
@@ -102,6 +104,12 @@ const Dashboard = () => {
       return data;
     },
   });
+
+  useEffect(() => {
+    if (profile) {
+      console.log('User profile:', profile);
+    }
+  }, [profile]);
 
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["services", profile?.id],
@@ -215,36 +223,52 @@ const Dashboard = () => {
     }
   });
 
-  // Fetch user bookings
-  const { data: userBookings, isLoading: userBookingsLoading } = useQuery({
+  // Get user bookings with proper error handling
+  const { data: userBookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ["user-bookings", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("bookings")
-        .select(`
-          *,
-          service:services (
+      try {
+        const { data, error } = await supabase
+          .from("bookings")
+          .select(`
             id,
-            title,
-            price,
-            provider:profiles (
+            status,
+            booking_date,
+            created_at,
+            service_id,
+            provider_id,
+            services (
               id,
-              full_name
+              title,
+              price,
+              provider_id,
+              provider:profiles (
+                id,
+                full_name
+              )
+            ),
+            feedbacks (
+              id,
+              rating,
+              comment
             )
-          ),
-          feedback:feedbacks (
-            id,
-            rating,
-            comment
-          )
-        `)
-        .eq("customer_id", user.id)
-        .order('created_at', { ascending: false });
+          `)
+          .eq("customer_id", user.id)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
-    },
+        if (error) {
+          console.error('Error fetching bookings:', error);
+          throw error;
+        }
+
+        console.log('Fetched user bookings:', data); // Debug log
+        return data;
+      } catch (error) {
+        console.error('Query error:', error);
+        return [];
+      }
+    }
   });
 
   // Update booking status mutation to invalidate stats
@@ -296,18 +320,47 @@ const Dashboard = () => {
 
   const addService = useMutation<void, Error, Omit<Service, 'id' | 'is_active'>>({
     mutationFn: async (newService) => {
-      const { error } = await supabase
+      if (!profile?.id) {
+        throw new Error('Provider profile not found');
+      }
+
+      // First verify the profile exists
+      const { data: providerProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', profile.id)
+        .single();
+
+      if (profileError || !providerProfile) {
+        console.error('Provider profile not found:', profileError);
+        throw new Error('Provider profile not found');
+      }
+
+      // Then create the service
+      const { error: serviceError } = await supabase
         .from('services')
         .insert([{ ...newService, provider_id: profile.id }]);
-      if (error) throw error;
+
+      if (serviceError) {
+        console.error('Service creation error:', serviceError);
+        throw serviceError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setIsAddingService(false);
+      toast({
+        title: "Success",
+        description: "Service added successfully"
+      });
     },
     onError: (error) => {
       console.error('Error adding service:', error);
-      // Add toast notification here if you have a toast system
+      toast({
+        title: "Error",
+        description: "Failed to add service. Please try again.",
+        variant: "destructive"
+      });
     }
   });
 
@@ -369,17 +422,8 @@ const Dashboard = () => {
     },
   });
 
-  if (userLoading || profileLoading || servicesLoading || userBookingsLoading) {
-    return (
-      <div className="min-h-screen pt-24 pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-64 bg-gray-200 rounded"></div>
-            <div className="h-4 w-48 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
+  if (profileLoading) {
+    return <div>Loading...</div>;
   }
 
   if (!user) {
@@ -549,37 +593,47 @@ const Dashboard = () => {
                 <h2 className="text-2xl font-semibold">My Bookings</h2>
               </div>
               <div className="space-y-4">
-                {userBookings?.map((booking) => (
-                  <Card key={booking.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">{booking.service?.title}</h3>
-                        <p className="text-sm text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
-                        <p className="text-sm text-gray-600">Price: ₹{booking.service?.price}</p>
-                        <div className="mt-2">
-                          <Badge variant={getStatusBadgeVariant(booking.status)}>
-                            {booking.status}
-                          </Badge>
+                {bookingsLoading ? (
+                  <div className="text-center py-8">Loading bookings...</div>
+                ) : userBookings && userBookings.length > 0 ? (
+                  <div className="space-y-4">
+                    {userBookings.map((booking) => (
+                      <Card key={booking.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold">{booking.service?.title}</h3>
+                            <p className="text-sm text-gray-600">
+                              Provider: {booking.service?.provider?.full_name}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Price: ₹{booking.service?.price}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Date: {new Date(booking.booking_date).toLocaleDateString()}
+                            </p>
+                            <div className="mt-2">
+                              <Badge variant={getStatusBadgeVariant(booking.status)}>
+                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              </Badge>
+                            </div>
+                          </div>
+                          {booking.status === 'completed' && !booking.feedbacks?.[0] && (
+                            <Button
+                              onClick={() => setSelectedBooking(booking)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Star className="w-4 h-4 mr-2" />
+                              Add Review
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        {booking.status === 'completed' && !booking.feedback?.[0] && (
-                          <Button
-                            onClick={() => setSelectedBooking(booking)}
-                            variant="outline"
-                            className="w-full"
-                          >
-                            <Star className="w-4 h-4 mr-2" />
-                            Add Feedback
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-                {userBookings?.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No bookings found. Browse services in the Discover section to make a booking.
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No bookings found</p>
                   </div>
                 )}
               </div>
