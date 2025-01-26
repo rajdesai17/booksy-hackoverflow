@@ -13,6 +13,7 @@ import Register from "@/pages/Register";
 import Discover from "@/pages/Discover";
 import Dashboard from "@/pages/Dashboard";
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ProtectedRoute from '@/components/ProtectedRoute'; // Add this import
 
 const queryClient = new QueryClient();
 
@@ -63,9 +64,11 @@ const App = () => {
                 <Route
                   path="/dashboard"
                   element={
-                    session ? 
-                      <ErrorBoundary><Dashboard /></ErrorBoundary> : 
-                      <Navigate to="/auth" />
+                    <ErrorBoundary>
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    </ErrorBoundary>
                   }
                 />
               </Routes>

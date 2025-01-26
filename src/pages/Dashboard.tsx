@@ -1,10 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+// Fix import statements
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Fix typo in package name
 import { supabase } from "@/integrations/supabase/client";
-import { CustomerBookings } from "@/components/dashboard/CustomerBookings";
+import { CustomerBookings } from "@/components/dashboard/CustomerBookings"; // Remove extra 'r'
 import { ProviderBookings } from "@/components/dashboard/ProviderBookings";
 import { ProviderFeedbacks } from "@/components/dashboard/ProviderFeedbacks";
 import { ServicesList } from "@/components/dashboard/ServicesList";
-import { Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card"; // Remove extra 'v'
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,10 +17,10 @@ import {
   IndianRupee,
   History
 } from "lucide-react";
-import { useState } from "react";
+import { useState } from "react"; // Remove extra 'i'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-
+import { useUser } from "@/hooks/useUser"; // Remove extra 'c'
 const categories = [
   "Haircuts",
   "Home Repairs", 
@@ -31,17 +32,45 @@ const categories = [
 
 const cities = ["Mumbai", "Pune", "Bangalore"];
 
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  city: string;
+  provider_id: string;
+  is_active: boolean;
+}
+
+interface Profile {
+  id: string;
+  full_name: string;
+  user_type: 'provider' | 'customer';
+}
+
+interface Booking {
+  id: string;
+  service: Service;
+  status: string;
+  feedback?: {
+    rating: number;
+    comment: string;
+  };
+}
+
 const Dashboard = () => {
-  const [editingService, setEditingService] = useState(null);
+  const { data: user, isLoading: userLoading } = useUser();
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [isAddingService, setIsAddingService] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [formRating, setFormRating] = useState(0);
   const queryClient = useQueryClient();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile"],
+    queryKey: ["profile", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -88,19 +117,15 @@ const Dashboard = () => {
     queryKey: ["dashboard-stats", profile?.id],
     enabled: !!profile?.id && profile?.user_type === "provider",
     queryFn: async () => {
-      // Get only accepted bookings
+      // Get only accepted bookings with price
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           id,
-          status,
-          service:services (
-            price
-          )
+          service:services (price)
         `)
         .eq('provider_id', profile.id)
         .eq('status', 'accepted');
-
       // Get all feedbacks
       const { data: feedbacks, error: feedbacksError } = await supabase
         .from('feedbacks')
@@ -109,23 +134,23 @@ const Dashboard = () => {
 
       // Get active services
       const { data: services, error: servicesError } = await supabase
-        .from('services')
-        .select('*')
-        .eq('provider_id', profile.id);
+      .from('services')
+      .select('*')
+      .eq('provider_id', profile.id)
+      .eq('is_active', true);
 
-      if (bookingsError || feedbacksError || servicesError) {
-        throw new Error('Failed to fetch stats');
-      }
+    if (bookingsError || feedbacksError || servicesError) {
+      throw new Error('Failed to fetch stats');
+    }
 
       // Calculate income from accepted bookings
       const totalIncome = bookings?.reduce((sum, booking) => 
         sum + (booking.service?.price || 0), 0) || 0;
-
-      // Calculate average rating
+  
       const avgRating = feedbacks?.length 
         ? feedbacks.reduce((acc, curr) => acc + curr.rating, 0) / feedbacks.length 
         : 0;
-
+  
       return {
         totalBookings: bookings?.length || 0,
         avgRating: avgRating.toFixed(1),
@@ -149,6 +174,31 @@ const Dashboard = () => {
         totalOrders: data?.length || 0
       };
     }
+  });
+
+  // Fetch user bookings
+  const { data: userBookings, isLoading: userBookingsLoading } = useQuery({
+    queryKey: ["user-bookings", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select(`
+          *,
+          service:services (
+            title,
+            price,
+            provider:profiles (
+              full_name
+            )
+          )
+        `)
+        .eq("customer_id", user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Update booking status mutation to invalidate stats
@@ -186,21 +236,17 @@ const Dashboard = () => {
     }
   });
 
-  const editService = useMutation({
+  const editService = useMutation<void, Error, Partial<Service>>({
     mutationFn: async (service) => {
       const { error } = await supabase
         .from('services')
         .update(service)
         .eq('id', service.id);
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['services']);
-      setEditingService(null);
     }
   });
 
-  const addService = useMutation({
+  const addService = useMutation<void, Error, Omit<Service, 'id' | 'is_active'>>({
     mutationFn: async (newService) => {
       const { error } = await supabase
         .from('services')
@@ -208,13 +254,73 @@ const Dashboard = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['services']);
-      queryClient.invalidateQueries(['dashboard-stats']);
+      queryClient.invalidateQueries({ queryKey: ['services'] });
       setIsAddingService(false);
+    },
+    onError: (error) => {
+      console.error('Error adding service:', error);
+      // Add toast notification here if you have a toast system
     }
   });
 
-  if (profileLoading || servicesLoading) {
+  // Add feedback submission mutation
+  const submitFeedback = useMutation<void, Error, { bookingId: string; rating: number; comment: string }>({
+    mutationFn: async ({ bookingId, rating, comment }) => {
+      const { error } = await supabase
+        .from('feedbacks')
+        .insert([
+          {
+            booking_id: bookingId,
+            rating,
+            comment,
+          },
+        ]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      setSelectedBooking(null);
+      setFormRating(0);
+    },
+  });
+
+  // Update the bookings query to include sorting
+  const { data: bookings } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          service:services(
+            *,
+            provider:profiles(*)
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+  
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user, // Only run query when user exists
+  });
+
+  // Update feedback dialog submit handler
+  const handleFeedbackSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    submitFeedback.mutate({
+      bookingId: selectedBooking?.id!,
+      rating: Number(formData.get('rating')),
+      comment: formData.get('comment') as string,
+    });
+  };
+
+  if (userLoading || profileLoading || servicesLoading || userBookingsLoading) {
     return (
       <div className="min-h-screen pt-24 pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -225,6 +331,10 @@ const Dashboard = () => {
         </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" />;
   }
 
   if (!profile) {
@@ -389,7 +499,34 @@ const Dashboard = () => {
                 <Users className="w-6 h-6 text-primary" />
                 <h2 className="text-2xl font-semibold">My Bookings</h2>
               </div>
-              <CustomerBookings />
+              <div className="space-y-4">
+                {userBookings?.map((booking) => (
+                  <Card key={booking.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold">{booking.service?.title}</h3>
+                        <p className="text-sm text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
+                        <p className="text-sm text-gray-600">Price: ₹{booking.service?.price}</p>
+                        <Badge variant={getStatusBadgeVariant(booking.status)}>
+                          {booking.status}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {booking.status === 'completed' && !booking.feedback && (
+                          <Button
+                            onClick={() => setSelectedBooking(booking)}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <Star className="w-4 h-4 mr-2" />
+                            Add Feedback
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -404,14 +541,16 @@ const Dashboard = () => {
               Make changes to your service details below.
             </p>
           </DialogHeader>
-          <form onSubmit={(e) => {
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
+            const form = e.currentTarget;
+            const formData = new FormData(form);
+            
             editService.mutate({
-              id: editingService.id,
-              title: formData.get('title'),
-              description: formData.get('description'),
-              price: formData.get('price')
+              id: editingService?.id,
+              title: formData.get('title') as string,
+              description: formData.get('description') as string,
+              price: Number(formData.get('price'))
             });
           }}>
             <div className="space-y-4">

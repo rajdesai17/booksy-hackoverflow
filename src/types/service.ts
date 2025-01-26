@@ -10,5 +10,6 @@ export interface Service {
     id: string;
     full_name: string;
     city: string;
+    is_active: boolean;
   };
 }
