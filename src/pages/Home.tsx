@@ -27,7 +27,7 @@ const Home = () => {
             transition={{ delay: 0.7 }}
             className="mt-8"
           >
-            <Button size="lg" className="bg-primary hover:bg-primary-dark">
+            <Button onClick={() => router.push('/discover')} size="lg" className="bg-primary hover:bg-primary-dark">
               Get Started
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
