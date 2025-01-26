@@ -13,6 +13,8 @@ interface Service {
   description: string | null;
   price: number;
   provider_id: string;
+  category: string;
+  city: string;
   provider?: {
     full_name: string;
   };
@@ -29,6 +31,9 @@ interface Booking {
     full_name: string;
   };
 }
+
+const CITIES = ["Mumbai", "Pune", "Bangalore"];
+const CATEGORIES = ["Haircuts", "Home Repairs", "Cleaning", "Gardening", "Personal Training", "Pet Care"];
 
 const Dashboard = () => {
   const [userType, setUserType] = useState<string | null>(null);
@@ -103,17 +108,25 @@ const Dashboard = () => {
 
   // Mutation for creating a service
   const createService = useMutation({
-    mutationFn: async (serviceData: { title: string; description: string; price: number }) => {
+    mutationFn: async (serviceData: {
+      title: string;
+      description: string;
+      price: number;
+      category: string;
+      city: string;
+    }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
       const { data, error } = await supabase
         .from("services")
-        .insert([{ 
+        .insert([{
           title: serviceData.title,
           description: serviceData.description,
           price: serviceData.price,
-          provider_id: user.id 
+          category: serviceData.category,
+          city: serviceData.city,
+          provider_id: user.id
         }])
         .select()
         .single();
@@ -135,6 +148,49 @@ const Dashboard = () => {
       });
     },
   });
+
+  const handleAddService = () => {
+    const title = prompt("Enter service title:");
+    if (!title) return;
+    
+    const description = prompt("Enter service description:");
+    if (!description) return;
+    
+    const priceStr = prompt("Enter service price:");
+    if (!priceStr) return;
+    
+    const category = prompt(`Enter service category (${CATEGORIES.join(", ")}):`);
+    if (!category || !CATEGORIES.includes(category)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid category",
+        description: "Please select a valid category",
+      });
+      return;
+    }
+
+    const city = prompt(`Enter your city (${CITIES.join(", ")}):`);
+    if (!city || !CITIES.includes(city)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid city",
+        description: "Please select a valid city",
+      });
+      return;
+    }
+    
+    const price = parseFloat(priceStr);
+    if (isNaN(price)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid price",
+        description: "Please enter a valid number for the price",
+      });
+      return;
+    }
+
+    createService.mutate({ title, description, price, category, city });
+  };
 
   // Mutation for creating a booking
   const createBooking = useMutation({
@@ -199,29 +255,6 @@ const Dashboard = () => {
     },
   });
 
-  const handleAddService = () => {
-    const title = prompt("Enter service title:");
-    if (!title) return;
-    
-    const description = prompt("Enter service description:");
-    if (!description) return;
-    
-    const priceStr = prompt("Enter service price:");
-    if (!priceStr) return;
-    
-    const price = parseFloat(priceStr);
-    if (isNaN(price)) {
-      toast({
-        variant: "destructive",
-        title: "Invalid price",
-        description: "Please enter a valid number for the price",
-      });
-      return;
-    }
-
-    createService.mutate({ title, description, price });
-  };
-
   const handleBookService = (serviceId: string) => {
     createBooking.mutate(serviceId);
   };
@@ -261,6 +294,8 @@ const Dashboard = () => {
                 <div className="space-y-2 text-gray-600">
                   <p>{service.description}</p>
                   <p>Price: ${service.price}</p>
+                  <p>Category: {service.category}</p>
+                  <p>City: {service.city}</p>
                   <p>Provider: {service.provider?.full_name}</p>
                 </div>
                 {userType === "customer" && (
