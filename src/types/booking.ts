@@ -1,4 +1,5 @@
 import type { Service } from "./service";
+import type { Feedback } from "./feedback";
 
 export interface Booking {
   id: string;
@@ -8,9 +9,13 @@ export interface Booking {
   booking_date: string;
   created_at: string;
   updated_at: string;
-  service: Service;
-  customer: {
+  service?: {
+    id: string;
+    title: string;
+  };
+  customer?: {
+    id: string;
     full_name: string;
   };
-  feedback?: Feedback;
+  feedback?: Feedback | null;
 }

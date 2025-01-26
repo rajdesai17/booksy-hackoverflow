@@ -8,7 +8,7 @@ export interface Service {
   provider_id: string;
   provider?: {
     id: string;
-    full_name: string;
-    city: string;
+    full_name: string | null;
+    city: string | null;
   };
 }

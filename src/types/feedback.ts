@@ -1,13 +1,19 @@
-import type { Service } from "./service";
+import type { Booking } from "./booking";
 
 export interface Feedback {
   id: string;
   booking_id: string;
   rating: number;
-  comment: string;
+  comment: string | null;
   created_at: string;
-  service: Service;
-  customer: {
-    full_name: string;
+  booking?: {
+    service: {
+      id: string;
+      title: string;
+      provider_id?: string;
+    };
+    customer: {
+      full_name: string;
+    };
   };
 }
