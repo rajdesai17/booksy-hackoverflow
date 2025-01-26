@@ -4,12 +4,18 @@ import path from "path";
 
 export default defineConfig({
   server: {
-    host: "::",
     port: 8080,
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
   },
   plugins: [react()],
   resolve: {
