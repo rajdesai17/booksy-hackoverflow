@@ -88,6 +88,8 @@ const Dashboard = () => {
             description,
             price,
             provider_id,
+            category,
+            city,
             provider:profiles(full_name)
           ),
           customer:profiles(full_name)
