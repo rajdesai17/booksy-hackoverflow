@@ -15,7 +15,8 @@ import {
   Edit,
   Trash2,
   IndianRupee,
-  History
+  History,
+  User
 } from "lucide-react";
 import { useState } from "react"; // Remove extra 'i'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/hooks/useUser"; // Remove extra 'c'
 import { Button } from "@/components/ui/button";
 import { Navigate } from "react-router-dom";
+import { EditProfileDialog } from "@/components/dashboard/EditProfileDialog";
+
 const categories = [
   "Haircuts",
   "Home Repairs", 
@@ -83,6 +86,7 @@ const Dashboard = () => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [formRating, setFormRating] = useState(0);
   const queryClient = useQueryClient();
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -789,6 +793,12 @@ const Dashboard = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      <EditProfileDialog 
+        profile={profile}
+        open={isEditingProfile}
+        onOpenChange={setIsEditingProfile}
+      />
     </div>
   );
 };

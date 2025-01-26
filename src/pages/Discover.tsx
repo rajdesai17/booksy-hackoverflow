@@ -254,15 +254,31 @@ const handleCategoryClick = (categoryName: string) => {
                   <div className="grid gap-6">
                     {services.map((service) => (
                       <Card key={service.id} className="p-6">
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between">
                           <div>
-                            <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-                            <p className="text-gray-600 mb-2">{service.description}</p>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <MapPin className="w-4 h-4 mr-1" />
-                              {service.city}
-                            </div>
-                            <p className="text-lg font-semibold mt-2">₹{service.price}</p>
+                            <h3 className="text-xl font-semibold">{service.title}</h3>
+                            <p className="text-gray-600">{service.provider.full_name}</p>
+                            {service.provider.contact_number && (
+                              <p className="text-sm text-gray-600">
+                                Contact: {service.provider.contact_number}
+                              </p>
+                            )}
+                            {service.provider.address && (
+                              <p className="text-sm text-gray-600">
+                                Address: {service.provider.address}
+                              </p>
+                            )}
+                            {service.provider.city && (
+                              <p className="text-sm text-gray-600">
+                                City: {service.provider.city}
+                              </p>
+                            )}
+                            {service.provider.bio && (
+                              <p className="text-sm text-gray-600 mt-2">
+                                {service.provider.bio}
+                              </p>
+                            )}
+                            <p className="text-primary font-semibold mt-2">₹{service.price}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Provided by</p>
@@ -274,7 +290,7 @@ const handleCategoryClick = (categoryName: string) => {
                             </button>
                             <div>
                               <Button 
-                                onClick={() => handleBookService(service.id)}
+                                onClick={() => handleBookService(service.id, service.provider_id)}
                                 variant="default"
                               >
                                 Book Now
