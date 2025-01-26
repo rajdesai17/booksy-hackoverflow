@@ -1,116 +1,91 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Star } from "lucide-react";
-import { useState } from "react";
+import { Star, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import type { Booking } from "@/types/booking";
 
 export const CustomerBookings = () => {
-  const { toast } = useToast();
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
+  const queryClient = useQueryClient();
 
-  const { data: bookings, isLoading, refetch } = useQuery({
+  const { data: bookings } = useQuery({
     queryKey: ["customer-bookings"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("bookings")
         .select(`
           *,
-          service:services(
-            id,
+          service:services (
             title,
-            provider:profiles(
-              id,
+            price,
+            provider:profiles (
               full_name
             )
-          ),
-          feedback:feedbacks(*)
+          )
         `)
-        .order('created_at', { ascending: false });
-
+        .eq("customer_id", user?.id);
       if (error) throw error;
-      return data as Booking[];
+      return data;
     },
   });
 
-  const handleComplete = async (bookingId: string) => {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'completed' })
-      .eq('id', bookingId);
+  const updateBookingStatus = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status })
+        .eq("id", bookingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["customer-bookings"]);
+    },
+  });
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Could not complete booking",
-        variant: "destructive",
-      });
-      return;
-    }
+  const submitFeedback = useMutation({
+    mutationFn: async ({ bookingId, rating, comment }: { bookingId: string; rating: number; comment: string }) => {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("service_id, provider:services(provider_id)")
+        .eq("id", bookingId)
+        .single();
 
-    refetch();
-    toast({
-      title: "Success",
-      description: "Booking marked as completed",
-    });
-  };
-
-  const handleFeedbackSubmit = async () => {
-    if (!selectedBooking) return;
-
-    const { error } = await supabase
-      .from('feedbacks')
-      .insert([
-        {
-          booking_id: selectedBooking,
+      const { error } = await supabase
+        .from("feedbacks")
+        .insert([{
+          booking_id: bookingId,
+          provider_id: booking?.provider?.provider_id,
           rating,
           comment
-        }
-      ]);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Could not submit feedback",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedBooking(null);
-    setRating(0);
-    setComment("");
-    refetch();
-    toast({
-      title: "Success",
-      description: "Feedback submitted successfully",
-    });
-  };
-
-  if (isLoading) return <div>Loading bookings...</div>;
+        }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["customer-bookings"]);
+      setSelectedBooking(null);
+    },
+  });
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">My Bookings</h2>
+    <div className="space-y-4">
       {bookings?.map((booking) => (
-        <Card key={booking.id} className="p-6">
+        <Card key={booking.id} className="p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-xl font-semibold mb-2">{booking.service?.title}</h3>
-              <p className="text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
-              <p className="text-gray-600">Status: {booking.status}</p>
-              <p className="text-gray-600">Date: {new Date(booking.booking_date).toLocaleDateString()}</p>
+              <h3 className="font-semibold">{booking.service?.title}</h3>
+              <p className="text-sm text-gray-600">Provider: {booking.service?.provider?.full_name}</p>
+              <p className="text-sm text-gray-600">Price: ₹{booking.service?.price}</p>
+              <Badge variant={getStatusBadgeVariant(booking.status)}>
+                {booking.status}
+              </Badge>
             </div>
             <div className="space-y-2">
-              {booking.status === 'confirmed' && (
+              {booking.status === 'accepted' && (
                 <Button
-                  onClick={() => handleComplete(booking.id)}
+                  onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: 'completed' })}
                   variant="outline"
                   className="w-full"
                 >
@@ -138,25 +113,37 @@ export const CustomerBookings = () => {
           <DialogHeader>
             <DialogTitle>Add Feedback</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex space-x-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  className={`p-1 ${rating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
-                >
-                  <Star className="w-6 h-6" />
-                </button>
-              ))}
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            submitFeedback.mutate({
+              bookingId: selectedBooking as string,
+              rating: Number(formData.get('rating')),
+              comment: formData.get('comment') as string
+            });
+          }}>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Rating</label>
+                <select name="rating" className="w-full mt-1 border rounded-md p-2" required>
+                  {[1,2,3,4,5].map(num => (
+                    <option key={num} value={num}>{num} Stars</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Comment</label>
+                <textarea 
+                  name="comment"
+                  required
+                  className="w-full mt-1 border rounded-md p-2"
+                />
+              </div>
+              <Button type="submit" disabled={submitFeedback.isLoading}>
+                Submit Feedback
+              </Button>
             </div>
-            <Textarea
-              placeholder="Write your feedback here..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-            <Button onClick={handleFeedbackSubmit}>Submit Feedback</Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

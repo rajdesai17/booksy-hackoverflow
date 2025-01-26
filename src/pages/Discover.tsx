@@ -30,24 +30,31 @@ const Discover = () => {
   const [priceRange, setPriceRange] = useState([0, 1000]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
+  // Add isLoading to services query
+  // Update the services query to include category filtering
+const { data: services, isLoading: servicesLoading } = useQuery({
+  queryKey: ["services", selectedCategory],
+  queryFn: async () => {
+    const query = supabase
+      .from("services")
+      .select("*, provider:profiles(*)")
+      .eq('is_active', true);
+    
+    if (selectedCategory) {
+      query.eq('category', selectedCategory);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+});
+  
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return user;
-    },
-  });
-
-  // Update services query to only show active services
-  const { data: services } = useQuery({
-    queryKey: ["services"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*, provider:profiles(*)")
-        .eq('is_active', true);
-      if (error) throw error;
-      return data;
     },
   });
 
@@ -150,9 +157,14 @@ const Discover = () => {
   >
     {createBooking.isLoading ? "Sending..." : "Book Now"}
   </Button>
-  const handleCategoryClick = (categoryName: string) => {
-    setSelectedCategory(categoryName);
-  };
+
+  // Update the handleCategoryClick function
+const handleCategoryClick = (categoryName: string) => {
+  setSelectedCategory(categoryName);
+  // Reset other filters when changing category
+  setSelectedCity(null);
+  setPriceRange([0, 1000]);
+};
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -236,7 +248,7 @@ const Discover = () => {
                   </button>
                 </div>
 
-                {isLoading ? (
+                {servicesLoading ? (
                   <div className="text-center py-8">Loading services...</div>
                 ) : services && services.length > 0 ? (
                   <div className="grid gap-6">

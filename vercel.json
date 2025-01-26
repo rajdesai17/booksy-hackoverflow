@@ -1,0 +1,16 @@
+{
+    "routes": [
+      { "src": "/", "dest": "/" },
+      { "src": "/discover", "dest": "/" },
+      { "src": "/dashboard", "dest": "/" },
+      { "src": "/[^.]+", "dest": "/", "status": 200 }
+    ],
+    "rewrites": [
+      { "source": "/(.*)", "destination": "/index.html" }
+    ],
+    "github": {
+      "silent": true
+    },
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist"
+  }
