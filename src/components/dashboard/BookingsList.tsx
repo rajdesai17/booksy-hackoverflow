@@ -47,7 +47,7 @@ export const BookingsList = ({
                 <div>
                   <h3 className="text-xl font-semibold mb-2">{booking.service.title}</h3>
                   {isProvider ? (
-                    <p className="text-gray-600">Booked by: {booking.customer.full_name}</p>
+                    <p className="text-gray-600">Booked by: {booking.customer?.full_name}</p>
                   ) : (
                     <p className="text-gray-600">Provider: {booking.service.provider?.full_name}</p>
                   )}

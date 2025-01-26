@@ -30,10 +30,10 @@ export const FeedbackList = ({ feedbacks, isLoading }: FeedbackListProps) => {
                 </div>
                 <p className="text-gray-600">{feedback.comment}</p>
                 <p className="text-sm text-gray-500 mt-2">
-                  By: {feedback.customer.full_name}
+                  By: {feedback.booking?.customer?.full_name}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Service: {feedback.service.title}
+                  Service: {feedback.booking?.service?.title}
                 </p>
               </div>
             </div>

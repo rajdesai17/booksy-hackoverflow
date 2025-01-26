@@ -84,9 +84,11 @@ const Discover = () => {
               id,
               title,
               provider_id
+            ),
+            customer:profiles(
+              full_name
             )
-          ),
-          customer:profiles(full_name)
+          )
         `)
         .eq('booking.service.provider_id', selectedProvider);
 
@@ -303,7 +305,7 @@ const Discover = () => {
                     </div>
                     <p className="text-gray-600 text-sm">{feedback.comment}</p>
                     <p className="text-gray-500 text-xs mt-2">
-                      By: {feedback.customer.full_name}
+                      By: {feedback.booking?.customer?.full_name}
                     </p>
                   </div>
                 ))
